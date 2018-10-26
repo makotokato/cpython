@@ -341,7 +341,7 @@ compare_pythons(const void * p1, const void * p2)
 static void
 locate_all_pythons()
 {
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(_M_ARM64)
     /* If we are a 64bit process, first hit the 32bit keys. */
     debug(L"locating Pythons in 32bit registry\n");
     locate_pythons_for_key(HKEY_CURRENT_USER, KEY_READ | KEY_WOW64_32KEY);
@@ -1378,7 +1378,7 @@ static void
 show_help_text(wchar_t ** argv)
 {
     wchar_t version_text [MAX_PATH];
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(_M_ARM64)
     BOOL canDo64bit = TRUE;
 #else
     /* If we are a 32bit process on a 64bit Windows, first hit the 64bit keys. */
@@ -1486,7 +1486,7 @@ process(int argc, wchar_t ** argv)
     if ((wp != NULL) && (*wp != L'\0'))
         log_fp = stderr;
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(_M_ARM64)
     debug(L"launcher build: 64bit\n");
 #else
     debug(L"launcher build: 32bit\n");
