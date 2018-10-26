@@ -43,9 +43,15 @@ void ffi_prep_args(char *stack, extended_cif *ecif)
   register unsigned int i;
   register void **p_argv;
   register char *argp;
+#ifdef _M_ARM64
+  register char *argd;
+#endif
   register ffi_type **p_arg;
 
-  argp = stack;
+  argp = stack + 8 * 8;
+#ifdef _M_ARM64
+  argd = stack;
+#endif
   if (ecif->cif->rtype->type == FFI_TYPE_STRUCT)
     {
       *(void **) argp = ecif->rvalue;
@@ -95,8 +101,21 @@ void ffi_prep_args(char *stack, extended_cif *ecif)
 	      break;
 
 	    case FFI_TYPE_FLOAT:
-	      *(uintptr_t *) argp = 0;
-	      *(float *) argp = *(float *)(* p_argv);
+#ifdef _M_ARM64
+        if (stack + 16 * 8 >= argd)
+        {
+            *(uintptr_t *) argd = 0;
+            *(float *) argd = *(float *)(* p_argv);
+            z = 0;
+            argd += 8;
+          }
+          else
+#else
+        {
+          *(uintptr_t *) argp = 0;
+          *(float *) argp = *(float *)(* p_argv);
+        }
+#endif
 	      break;
 
 	    // 64-bit value cases should never be used for x86 and AMD64 builds
@@ -113,8 +132,21 @@ void ffi_prep_args(char *stack, extended_cif *ecif)
 	      break;
 
 	    case FFI_TYPE_DOUBLE:
-	      *(uintptr_t *) argp = 0;
-	      *(double *) argp = *(double *)(* p_argv);
+#ifdef _M_ARM64
+        if (stack + 16 * 8 >= argd)
+        {
+	        *(uintptr_t *) argd = 0;
+	        *(double *) argd = *(double *)(* p_argv);
+          z = 0;
+          argd += 8;
+        }
+        else
+#else
+        {
+	        *(uintptr_t *) argp = 0;
+	        *(double *) argp = *(double *)(* p_argv);
+        }
+#endif
 	      break;
 
 	    default:
@@ -210,9 +242,18 @@ ffi_call_x86(void (*)(char *, extended_cif *),
 	     void (*fn)());
 #endif
 
-#ifdef _WIN64
+#if defined(_M_X64)
 extern int
 ffi_call_AMD64(void (*)(char *, extended_cif *),
+		 /*@out@*/ extended_cif *,
+		 unsigned, unsigned,
+		 /*@out@*/ unsigned *,
+		 void (*fn)());
+#endif
+
+#if defined(_M_ARM64)
+extern int
+ffi_call_ARM64(void (*)(char *, extended_cif *),
 		 /*@out@*/ extended_cif *,
 		 unsigned, unsigned,
 		 /*@out@*/ unsigned *,
@@ -265,8 +306,13 @@ ffi_call(/*@dependent@*/ ffi_cif *cif,
           }
       }
       /*@-usedef@*/
+#ifdef _M_ARM64
+      return ffi_call_ARM64(ffi_prep_args, &ecif, cif->bytes,
+			   cif->flags, ecif.rvalue, fn);
+#else
       return ffi_call_AMD64(ffi_prep_args, &ecif, cif->bytes,
 			   cif->flags, ecif.rvalue, fn);
+#endif
       /*@=usedef@*/
       break;
 #endif
@@ -473,7 +519,7 @@ ffi_prep_closure_loc (ffi_closure* closure,
 #define SHORT(x) *(short*)tramp = x, tramp += sizeof(short)
 #define INT(x) *(int*)tramp = x, tramp += sizeof(int)
 
-#ifdef _WIN64
+#ifdef _M_X64
   if (cif->nargs >= 1 &&
       (cif->arg_types[0]->type == FFI_TYPE_FLOAT
        || cif->arg_types[0]->type == FFI_TYPE_DOUBLE))
@@ -503,6 +549,15 @@ ffi_prep_closure_loc (ffi_closure* closure,
   /* 41 FF E2           jmp         r10 */
   BYTES("\x41\xFF\xE2");
 
+#elif defined( _M_ARM64)
+  /* A9 7A 7B FD        blr x8 */
+  BYTES("\xA9\x7A\x7B\xFD");
+
+  /* D6 5F 03 C0        ret */
+  BYTES("\xd6\x5F\x03\xC0");
+
+  POINTER(closure);
+  POINTER(ffi_closure_OUTER);
 #else
 
   /* mov ecx, closure */
