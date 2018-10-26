@@ -44,7 +44,7 @@
  */
 
 #if defined(CONFIG_64)
-#if defined(ANSI)
+#if defined(ANSI) || (defined(MASM) && defined(_M_ARM64))
 #if defined(HAVE_UINT128_T)
 static inline void
 _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
